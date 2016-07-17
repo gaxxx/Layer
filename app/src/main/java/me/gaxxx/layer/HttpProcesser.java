@@ -1,45 +1,36 @@
 package me.gaxxx.layer;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Created by siwu on 7/11/16.
  */
-public class HttpProcesser implements Layer.Proccessor<Integer> {
-
-    Random seed = new Random(System.currentTimeMillis());
+public abstract class HttpProcesser<T> implements Layer.Proccessor<T> {
     @Override
-    public Integer get(String key) {
-        try {
-            Thread.sleep(3000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+    public T get(String key) {
+        Map<String,T> ret = mget(new TreeSet<String>(Collections.singletonList(key)));
+        if (ret != null) {
+            return ret.get(key);
         }
-        return seed.nextInt();
+        return null;
     }
 
     @Override
-    public Map<String, Integer> mget(Set<String> keys) {
-         try {
-            Thread.sleep(3000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        HashMap<String, Integer> ret = new HashMap<String, Integer>();
-        for (String k : keys) {
-                ret.put(k, seed.nextInt());
-        }
-        return ret;
+    abstract  public Map<String,T> mget(Set<String> keys);
+
+    @Override
+    public int msave(HashMap<String, T> toSave) {
+        return 0;
     }
 
     @Override
-    public void batchSave(HashMap<String, Integer> toSave) {
-    }
-
-    @Override
-    public void batchRemove(Set<String> keys) {
+    public int mremove(Set<String> keys) {
+        return 0;
     }
 }

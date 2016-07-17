@@ -22,7 +22,22 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        Layer<Integer> layer = new Layer.Builder<Integer>().processor(new MemoryProcesser<Integer>()).next().processor(new HttpProcesser()).build();
+        Layer<Integer> layer = new Layer.Builder<Integer>().processor(new MemoryProcesser<Integer>()).next().processor(new HttpProcesser<Integer>(){
+
+            @Override
+            public Map<String, Integer> mget(Set<String> keys) {
+                try {
+                    Thread.sleep(100l);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                HashMap<String, Integer> ret = new HashMap<>();
+                for (String s : keys) {
+                    ret.put(s,100);
+                }
+                return ret;
+            }
+        }).build();
         Set<String> keys = new HashSet<>();
         for (int i=0;i<50;i++) {
             keys.add(String.valueOf(i));
@@ -40,7 +55,7 @@ public class MainActivity extends Activity {
                                        }
                                    }
         );
-        layer.mremove(keys,true);
+        layer.mremove(keys,true,false);
         for (int i=0;i<1000;i++) {
             final int finalI = i % 100;
             layer.get(String.valueOf(finalI)).subscribe(

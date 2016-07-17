@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 
 import rx.Observable;
@@ -39,22 +38,44 @@ public class Layer<T> {
         return _mget(keys).subscribeOn(Schedulers.io());
     }
 
-    public void remove(String key,boolean cursive) {
+    public void remove(String key,boolean cursive,boolean sync) {
         Set<String> keys = new TreeSet<>(Collections.singletonList(key));
-        mremove(keys,cursive);
+        mremove(keys,cursive,sync);
     }
 
-    public void mremove(final Set<String> keys,final boolean cursive) {
-        Observable.fromCallable(new Callable<Void>() {
+    public void mremove(Set<String> keys,boolean cursive,boolean sync) {
+        Observable<Void> ob = _mremove(keys,cursive);
+        if (!sync) {
+            ob = ob.subscribeOn(Schedulers.io());
+        }
+        ob.doOnError(new Action1<Throwable>() {
             @Override
-            public Void call() throws Exception {
-                proccessor.batchRemove(keys);
-                if (cursive && next != null) {
-                    next.mremove(keys,true);
-                }
-                return null;
+            public void call(Throwable throwable) {
+                throwable.printStackTrace();
             }
-        }).subscribeOn(scheduler).subscribe();
+        }).subscribe();
+    }
+
+    private Observable<Void> _remove(String key,boolean cursive) {
+        Set<String> keys = new TreeSet<>(Collections.singletonList(key));
+        return _mremove(keys,cursive);
+    }
+
+    private Observable<Void> _mremove(final Set<String> keys,final boolean cursive) {
+        return Observable.create(new Observable.OnSubscribe<Void>() {
+            @Override
+            public void call(Subscriber<? super Void> subscriber) {
+                int size = proccessor.mremove(keys);
+                if (size > 0) {
+                    Log.d(proccessor.getClass().getName(),"mremove " + size);
+                }
+                if (cursive && next != null) {
+                    next._mremove(keys,true).subscribeOn(scheduler).subscribe(subscriber);
+                }else {
+                    subscriber.onCompleted();
+                }
+            }
+        });
     }
 
 
@@ -68,6 +89,7 @@ public class Layer<T> {
                     if (!subscriber.isUnsubscribed()) {
                         subscriber.onNext(v);
                         subscriber.onCompleted();
+                        return;
                     }
                 }
 
@@ -117,7 +139,7 @@ public class Layer<T> {
                     throwable.printStackTrace();
                 }
                 Log.d(proccessor.getClass().getName(),String.format("batch save %d",toSave.size()));
-                proccessor.batchSave(toSave);
+                proccessor.msave(toSave);
                 for (Map.Entry<String, T> v : toSave.entrySet()) {
                     if (todo.containsKey(v.getKey())) {
                         Subscriber<? super T> s = todo.get(v.getKey());
@@ -171,7 +193,7 @@ public class Layer<T> {
 
         return Observable.create(new Observable.OnSubscribe<Map<String, T>>() {
             @Override
-            public void call(Subscriber<? super Map<String, T>> subscriber) {
+            public void call(final Subscriber<? super Map<String, T>> subscriber) {
                 Log.d(proccessor.getClass().getName(),String.format("mget %s", keys));
                 Map<String, T> v = proccessor.mget(keys);
 
@@ -179,6 +201,7 @@ public class Layer<T> {
                     if (!subscriber.isUnsubscribed()) {
                         subscriber.onNext(v);
                         subscriber.onCompleted();
+                        return;
                     }
                 }
 
@@ -186,6 +209,7 @@ public class Layer<T> {
                     if (!subscriber.isUnsubscribed()) {
                         subscriber.onNext(v);
                         subscriber.onCompleted();
+                        return;
                     }
                 }
 
@@ -221,8 +245,43 @@ public class Layer<T> {
                         }));
                     }
                     ret = ret.mergeWith(trigger());
+                    final Map<String,T> toSave = new HashMap<String, T>();
+                    final Action1<Throwable> onComplete = new Action1<Throwable>() {
+                        @Override
+                        public void call(Throwable throwable) {
+                            if (throwable != null) {
+                                throwable.printStackTrace();
+                            }
+
+                            if (!subscriber.isUnsubscribed()) {
+                                subscriber.onNext(toSave);
+                                subscriber.onCompleted();
+                            }
+                        }
+                    };
+                    ret.subscribe(
+                            new Action1<Map<String, T>>() {
+                                @Override
+                                public void call(Map<String, T> stringTMap) {
+                                    toSave.putAll(stringTMap);
+                                }
+                            },
+                            new Action1<Throwable>() {
+                                @Override
+                                public void call(Throwable throwable) {
+                                    onComplete.call(throwable);
+                                }
+                            },
+                            new Action0() {
+                                @Override
+                                public void call() {
+                                    onComplete.call(null);
+
+                                }
+                            }
+                    );
+
                 }
-                ret.subscribe(subscriber);
             }
         });
     }
@@ -291,7 +350,7 @@ public class Layer<T> {
     public interface Proccessor<T> {
         T get(String key);
         Map<String,T> mget(Set<String> keys);
-        void batchSave(HashMap<String, T> toSave);
-        void batchRemove(Set<String> keys);
+        int msave(HashMap<String, T> toSave);
+        int mremove(Set<String> keys);
     }
 }

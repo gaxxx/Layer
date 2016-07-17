@@ -36,17 +36,21 @@ public class MemoryProcesser<T> implements Layer.Proccessor<T> {
     }
 
     @Override
-    public synchronized void batchSave(HashMap<String, T> toSave) {
+    public synchronized int msave(HashMap<String, T> toSave) {
         for (Map.Entry<String,T> m : toSave.entrySet()) {
             cache.put(m.getKey(),m.getValue());
         }
-
+        return toSave.size();
     }
 
     @Override
-    public synchronized void batchRemove(Set<String> keys) {
+    public synchronized int mremove(Set<String> keys) {
+        int i = 0;
         for (String k :keys) {
-            cache.remove(k);
+            if (cache.remove(k) != null) {
+                i++;
+            }
         }
+        return i;
     }
 }
