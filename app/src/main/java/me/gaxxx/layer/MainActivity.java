@@ -2,19 +2,23 @@ package me.gaxxx.layer;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.SynchronousQueue;
 
+import rx.Scheduler;
 import rx.functions.Action1;
 import rx.schedulers.Schedulers;
 
@@ -23,9 +27,10 @@ public class MainActivity extends Activity {
     int httpGetCount = 0;
     int httpGetTimes = 0;
     private Layer<Integer> layer;
+    private Layer<Integer> layer2;
 
     private void httpStatisShow() {
-        Toast.makeText(this,String.format("http get times:%d, total:%d",httpGetCount,httpGetTimes),Toast.LENGTH_SHORT).show();
+        showToast("http get times:%d, total:%d",httpGetCount,httpGetTimes);
     }
 
     private void httpStaticReset() {
@@ -55,10 +60,18 @@ public class MainActivity extends Activity {
             }
         };
 
+        Scheduler scheduler = Schedulers.from(Executors.newFixedThreadPool(3));
+        MemoryProcesser<Integer> memoryProcess = new MemoryProcesser<>();
+
         layer = new Layer.Builder<Integer>()
-                .processor(new MemoryProcesser<Integer>()).schedule(Schedulers.from(Executors.newFixedThreadPool(3)))
+                .processor(memoryProcess).schedule(scheduler)
                 .next().processor(httpProcesser).schedule(Schedulers.from(Executors.newFixedThreadPool(3)))
                 .build();
+
+        layer2 =  new Layer.Builder<Integer>()
+                .processor(memoryProcess).schedule(scheduler).build();
+
+
 
         Button get_1000_key_sep = (Button) findViewById(R.id.get_1000_key);
         get_1000_key_sep.setOnClickListener(new View.OnClickListener() {
@@ -170,7 +183,7 @@ public class MainActivity extends Activity {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                Toast.makeText(MainActivity.this,String.format("total get is %d for 10 times",totalToGet.size()),Toast.LENGTH_SHORT).show();
+                showToast("total get is %d for 10 times",totalToGet.size());
                 httpStatisShow();
                 httpStaticReset();
                 layer.mremove(totalToGet,true,true);
@@ -179,6 +192,123 @@ public class MainActivity extends Activity {
             }
         });
 
+        Button button = (Button) findViewById(R.id.multi_layer);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final CountDownLatch ct = new CountDownLatch(1);
+
+                final Set<String> data = new HashSet<String>();
+                for (int i=0;i<100;i++) {
+                    data.add(String.valueOf(i));
+                }
+
+                layer.mget(data).subscribe(
+                        new Action1<Map<String, Integer>>() {
+                            @Override
+                            public void call(Map<String, Integer> stringIntegerMap) {
+                                ct.countDown();
+
+                            }
+                        },
+                        new Action1<Throwable>() {
+                            @Override
+                            public void call(Throwable throwable) {
+                                ct.countDown();
+
+                            }
+                        }
+                );
+
+
+                layer2.mget(data).subscribe(
+                        new Action1<Map<String, Integer>>() {
+                            @Override
+                            public void call(Map<String, Integer> stringIntegerMap) {
+                                showToast("get %d item",stringIntegerMap.size());
+                            }
+                        },
+                        new Action1<Throwable>() {
+                            @Override
+                            public void call(Throwable throwable) {
+
+                            }
+                        }
+                );
+
+                try {
+                    ct.await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+                final CountDownLatch ct2 = new CountDownLatch(1);
+                layer2.mget(data).subscribe(
+                        new Action1<Map<String, Integer>>() {
+                            @Override
+                            public void call(Map<String, Integer> stringIntegerMap) {
+                                showToast("get %d item",stringIntegerMap.size());
+                                ct2.countDown();
+                            }
+                        },
+                        new Action1<Throwable>() {
+                            @Override
+                            public void call(Throwable throwable) {
+                                ct2.countDown();
+
+                            }
+                        }
+                );
+                try {
+                    ct2.await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+                data.add("101");
+
+                final CountDownLatch ct3 = new CountDownLatch(1);
+
+                layer2.mget(data).subscribe(
+                        new Action1<Map<String, Integer>>() {
+                            @Override
+                            public void call(Map<String, Integer> stringIntegerMap) {
+                                showToast("get %d item,but actual size is %d",stringIntegerMap.size(),data.size());
+                                ct3.countDown();
+                            }
+                        },
+                        new Action1<Throwable>() {
+                            @Override
+                            public void call(Throwable throwable) {
+                                throwable.printStackTrace();
+                                ct3.countDown();
+                            }
+                        }
+                );
+
+                try {
+                    ct3.await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                layer.mremove(data,true,true);
+                httpStaticReset();
+            }
+        });
+
 
     }
+
+
+    public void showToast(final String format, Object... args) {
+        final String str = String.format(Locale.getDefault(), format, args);
+        new Handler(getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(MainActivity.this,str,Toast.LENGTH_SHORT).show();
+
+            }
+        });
+    }
+
 }
