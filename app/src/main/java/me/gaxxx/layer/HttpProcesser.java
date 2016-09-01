@@ -1,5 +1,7 @@
 package me.gaxxx.layer;
 
+import com.github.gaxxx.layer_cache.Layer;
+
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;

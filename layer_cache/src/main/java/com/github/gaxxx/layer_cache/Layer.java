@@ -1,4 +1,4 @@
-package me.gaxxx.layer;
+package com.github.gaxxx.layer_cache;
 
 import android.util.Log;
 

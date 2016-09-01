@@ -7,16 +7,17 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
+import com.github.gaxxx.layer_cache.Layer;
+import com.github.gaxxx.layer_cache.MemoryProcesser;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
-import java.util.concurrent.SynchronousQueue;
 
 import rx.Scheduler;
 import rx.functions.Action1;
@@ -61,7 +62,7 @@ public class MainActivity extends Activity {
         };
 
         Scheduler scheduler = Schedulers.from(Executors.newFixedThreadPool(3));
-        MemoryProcesser<Integer> memoryProcess = new MemoryProcesser<>();
+        MemoryProcesser<Integer> memoryProcess = new MemoryProcesser<>(500);
 
         layer = new Layer.Builder<Integer>()
                 .processor(memoryProcess).schedule(scheduler)

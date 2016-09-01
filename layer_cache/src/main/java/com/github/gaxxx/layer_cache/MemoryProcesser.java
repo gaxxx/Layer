@@ -1,4 +1,4 @@
-package me.gaxxx.layer;
+package com.github.gaxxx.layer_cache;
 
 import android.util.LruCache;
 
@@ -10,7 +10,11 @@ import java.util.Set;
  * Created by siwu on 7/11/16.
  */
 public class MemoryProcesser<T> implements Layer.Proccessor<T> {
-    private LruCache<String,T> cache = new LruCache<>(500);
+    private LruCache<String,T> cache;
+
+    public MemoryProcesser(int max) {
+        this.cache = new LruCache<>(max);
+    }
 
     @Override
     public synchronized T get(String key) {
