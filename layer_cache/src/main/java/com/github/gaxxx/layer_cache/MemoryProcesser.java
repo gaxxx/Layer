@@ -40,7 +40,7 @@ public class MemoryProcesser<T> implements Layer.Proccessor<T> {
     }
 
     @Override
-    public synchronized int msave(HashMap<String, T> toSave) {
+    public synchronized int msave(Map<String, T> toSave) {
         for (Map.Entry<String,T> m : toSave.entrySet()) {
             cache.put(m.getKey(),m.getValue());
         }

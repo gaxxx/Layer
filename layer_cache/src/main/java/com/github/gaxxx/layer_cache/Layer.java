@@ -38,6 +38,45 @@ public class Layer<T> {
         return _mget(keys).subscribeOn(Schedulers.io());
     }
 
+    public void update(final String key, final T value, boolean cursive, boolean sync) {
+        HashMap<String,T> h = new HashMap<String,T>() {
+            {
+                put(key,value);
+            }
+        };
+        mupdate(h,cursive,sync);
+    }
+
+    public void mupdate(final Map<String,T> obj,boolean cursive,boolean sync) {
+        Observable<Void> ob = _mupdate(obj,cursive);
+        if (!sync) {
+            ob = ob.subscribeOn(Schedulers.io());
+        }
+        ob.doOnError(new Action1<Throwable>() {
+                         @Override
+                         public void call(Throwable throwable) {
+                             throwable.printStackTrace();
+                         }
+                     }
+        ).subscribe();
+    }
+
+
+    public Observable<Void> _mupdate(final Map<String,T> obj, final boolean cursive) {
+        return Observable.create(new Observable.OnSubscribe<Void>() {
+            @Override
+            public void call(Subscriber<? super Void> subscriber) {
+                proccessor.msave(obj);
+                if (cursive && next != null) {
+                    next._mupdate(obj,true).subscribeOn(scheduler).subscribe(subscriber);
+                }else {
+                    subscriber.onCompleted();
+                }
+
+            }
+        });
+    }
+
     public void remove(String key,boolean cursive,boolean sync) {
         Set<String> keys = new TreeSet<>(Collections.singletonList(key));
         mremove(keys,cursive,sync);
@@ -350,7 +389,7 @@ public class Layer<T> {
     public interface Proccessor<T> {
         T get(String key);
         Map<String,T> mget(Set<String> keys);
-        int msave(HashMap<String, T> toSave);
+        int msave(Map<String, T> toSave);
         int mremove(Set<String> keys);
     }
 }

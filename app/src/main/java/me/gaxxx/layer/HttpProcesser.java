@@ -27,7 +27,7 @@ public abstract class HttpProcesser<T> implements Layer.Proccessor<T> {
     abstract  public Map<String,T> mget(Set<String> keys);
 
     @Override
-    public int msave(HashMap<String, T> toSave) {
+    public int msave(Map<String, T> toSave) {
         return 0;
     }
 
